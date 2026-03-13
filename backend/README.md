@@ -24,6 +24,11 @@ Avant de commencer, tu auras besoin de :
     ```
     Cette commande lit le fichier `requirements.txt` et installe toutes les dépendances listées.
 
+3.  **Crée un fichier `.env`**
+
+    Copie le fichier `.env.example` et renomme-le en `.env`. Puis, remplis les valeurs API.
+
+
 ## Lancement du serveur
 
 Pour lancer l'application, utilisez la commande :
