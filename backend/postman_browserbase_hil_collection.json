@@ -1,0 +1,161 @@
+{
+  "info": {
+    "name": "Project AVI",
+    "_postman_id": "2b4f13f2-4b7e-4b1e-9d80-0f9be18c5d8d",
+    "description": "API Human-in-Loop : lancer un run à partir d'un CSV/Excel ou d'une image (OCR), suivre l'exécution via SSE, puis signaler la soumission manuelle pour passer à la suite.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "run_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Run - Démarrer (CSV / Excel)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/run",
+          "host": ["{{baseUrl}}"],
+          "path": ["run"]
+        },
+        "description": "But : envoyer un fichier CSV ou Excel (.xlsx) et démarrer le run (session Browserbase + agent).\n\nÉtapes :\n1) Choisis ton fichier dans form-data (clé : file)\n2) Exécute la requête\n3) Récupère la réponse : {run_id, live_view_url}\n4) Ouvre la Live View avec live_view_url\n\nPré-requis :\n- Backend démarré\n- BROWSERBASE_API_KEY configurée (env)\n- GROQ_API_KEY configurée (env)"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.environment.set('run_id', json.run_id);",
+              "pm.collectionVariables.set('run_id', json.run_id);",
+              "console.log('live_view_url:', json.live_view_url);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Run - Démarrer (Image -> OCR -> agent)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/run/image",
+          "host": ["{{baseUrl}}"],
+          "path": ["run", "image"]
+        },
+        "description": "But : envoyer une image, faire l'OCR (Gemini), transformer le JSON extrait en une ligne, puis démarrer le run (session Browserbase + agent).\n\nÉtapes :\n1) Choisis ton image dans form-data (clé : file)\n2) Exécute la requête\n3) La réponse contient : {run_id, live_view_url}\n4) Ouvre la Live View, vérifie le remplissage, puis soumets manuellement\n\nPré-requis :\n- Backend démarré\n- BROWSERBASE_API_KEY configurée (env)\n- GROQ_API_KEY configurée (env)\n- GEMINI_API_KEY configurée (env)"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "const json = pm.response.json();",
+              "pm.environment.set('run_id', json.run_id);",
+              "pm.collectionVariables.set('run_id', json.run_id);",
+              "console.log('live_view_url:', json.live_view_url);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "OCR - Extraire (debug)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/ocr",
+          "host": ["{{baseUrl}}"],
+          "path": ["ocr"]
+        },
+        "description": "But : endpoint de debug. Envoie une image et récupère le JSON extrait par OCR, sans lancer l'agent.\n\nÉtapes :\n1) Choisis ton image dans form-data (clé : file)\n2) Exécute la requête\n3) La réponse contient {data, raw_text}\n\nPré-requis :\n- GEMINI_API_KEY configurée (env)"
+      }
+    },
+    {
+      "name": "Run - Événements (SSE)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "text/event-stream"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/run/{{run_id}}/events",
+          "host": ["{{baseUrl}}"],
+          "path": ["run", "{{run_id}}", "events"]
+        },
+        "description": "But : suivre le run en temps réel via Server-Sent Events (SSE).\n\nUtilisation :\n1) Lance d'abord un run (/run ou /run/image) pour obtenir run_id\n2) Ouvre cette requête pour écouter les événements\n\nÉvénements typiques :\n- {type: 'awaiting_user_submit', row_index: 0} : prêt, à toi de cliquer sur Envoyer dans la Live View\n- {type: 'running', row_index: 0} : l'agent continue\n- {type: 'completed'} : terminé\n- {type: 'failed', error: '...'} : erreur\n\nNote : Postman supporte SSE selon la version. Sinon :\n  curl -N {{baseUrl}}/run/{{run_id}}/events"
+      }
+    },
+    {
+      "name": "Run - Soumission effectuée (continuer)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/run/{{run_id}}/submit",
+          "host": ["{{baseUrl}}"],
+          "path": ["run", "{{run_id}}", "submit"]
+        },
+        "description": "But : action Human-in-Loop. Appelle cette route après avoir cliqué sur Envoyer dans la Live View.\n\nEffet :\n- Débloque l'agent\n- Permet de passer à la ligne suivante (si CSV/Excel contient plusieurs lignes)"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
