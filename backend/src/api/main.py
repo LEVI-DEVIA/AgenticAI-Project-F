@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from dotenv import find_dotenv, load_dotenv
+
+# Charge les variables d'environnement en toute première chose, en cherchant activement le .env
+load_dotenv(find_dotenv())
+
 import asyncio
 import csv
 import json
@@ -14,11 +19,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from google.genai import types
 from openpyxl import load_workbook
-from src.agent.agent_ia import (
+from src.agent.agent_avi import (
     DEFAULT_LINK,
     create_browserbase_session,
     get_browserbase_live_view_urls,
-    run_agent,
+    run_agent_stagehand,
 )
 from sse_starlette.sse import EventSourceResponse
 
@@ -115,7 +120,9 @@ async def _start_run_from_csv_path(csv_path: Path) -> dict:
             run_state = RUNS.get(run_id)
             if not run_state:
                 return
-            connect_url = (run_state.get("browserbase") or {}).get("connect_url")
+            session_id = (run_state.get("browserbase") or {}).get("session_id")
+            if not isinstance(session_id, str):
+                raise RuntimeError("session_id manquant ou invalide")
 
             async def wait_for_user_submit(row_index: int):
                 run_state_inner = RUNS.get(run_id)
@@ -132,9 +139,9 @@ async def _start_run_from_csv_path(csv_path: Path) -> dict:
                 run_state_inner["state"] = "running"
                 await q.put({"type": "running", "row_index": row_index})
 
-            await run_agent(
+            await run_agent_stagehand(
                 Path(run_state["csv_path"]),
-                cdp_url=connect_url,
+                session_id=session_id,
                 wait_for_user_submit=wait_for_user_submit,
             )
 
